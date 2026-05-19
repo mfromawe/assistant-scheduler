@@ -1,0 +1,413 @@
+# Assistant Scheduler Yapilacaklar Listesi
+
+Bu dokuman projeyi adim adim ayaga kaldirmak icin backend, frontend, entegrasyon, altyapi ve operasyon islerini siralar. Hedef: WhatsApp ve Instagram uzerinden randevu olusturan, iki adimli onay alan, gerekirse on odeme baslatan, firmalara satilabilir merkezi randevu/takvim sistemi.
+
+## 0. Mevcut Durum
+
+- [x] Next.js + TypeScript proje iskeleti kuruldu.
+- [x] Prisma + SQLite demo veri modeli kuruldu.
+- [x] Dashboard, randevu, mesaj, musteri ve yonetim ekranlari olusturuldu.
+- [x] Google Calendar benzeri haftalik takvim UI baslatildi.
+- [x] WhatsApp webhook endpoint iskeleti eklendi.
+- [x] Instagram webhook endpoint iskeleti eklendi.
+- [x] Randevu olusturma endpointi eklendi.
+- [x] Iki adimli onay endpointi eklendi.
+- [x] On odeme checkout endpointi eklendi.
+- [x] Stripe ve WhatsApp anahtarlari yokken mock calisma saglandi.
+- [x] TR/EN icin ilk dil altyapisi eklendi.
+- [x] Google/Microsoft takvim entegrasyonu icin ortak veri modeli hazirlandi.
+- [x] Cold/hot reach icin lead, kampanya, aktivite ve kanal entegrasyonu veri modeli eklendi.
+- [x] n8n uzerinden Google Places/Sheets lead import endpointi eklendi.
+- [x] Dashboard icine Outreach Merkezi eklendi.
+
+## 1. Backend Temel Isler
+
+### 1.1 Veritabani Modeli
+
+- [x] SQLite yerine production icin PostgreSQL gecisine hazirlan.
+- [x] `Tenant` modelini multi-tenant SaaS ihtiyacina gore genislet.
+- [ ] Firma abonelik plani, kota, durum ve faturalama alanlari ekle. Plan ve durum alanlari eklendi; kota/faturalama detaylari bekliyor.
+- [ ] Kullanici davet sistemi icin `Invitation` modeli ekle.
+- [ ] Calisma saatleri icin `AvailabilityRule` modeli ekle.
+- [ ] Tatil/kapali gunler icin `BlackoutDate` modeli ekle.
+- [ ] Randevu cakismalarini kontrol edecek unique/index stratejisi belirle.
+- [ ] Musteri izinleri icin KVKK/GDPR alanlari ekle.
+- [ ] Audit log icin `AuditLog` modeli ekle.
+- [x] Harici takvim senkronizasyonu icin `CalendarConnection` modeli ekle.
+- [x] Mesaj saglayici ayarlari icin `ChannelIntegration` modeli ekle.
+- [x] Google Places/Sheets kaynakli firma adaylari icin `OutreachLead` modeli ekle.
+- [x] Cold/hot reach kampanyalari icin `OutreachCampaign` ve `OutreachActivity` modellerini ekle.
+
+### 1.2 Auth ve Yetkilendirme
+
+- [ ] NextAuth veya alternatif auth katmanini aktiflestir.
+- [ ] Email/sifre giris endpointleri olustur.
+- [ ] Role-based access control uygula: `OWNER`, `ADMIN`, `STAFF`.
+- [ ] Tenant izolasyonu middleware'i ekle.
+- [ ] Her API isteginde kullanicinin tenant yetkisini dogrula. Dashboard okuma sorgulari tenant context ile filtrelendi; auth session baglantisi bekliyor.
+- [ ] Admin panelini auth arkasina al.
+- [ ] Session yenileme ve guvenli cookie ayarlarini yap.
+- [ ] Sifre sifirlama akisini ekle.
+- [ ] Firma ekip daveti akisini ekle.
+- [x] Platform ekibi icin tenant ustu `PlatformUser` modeli ekle.
+- [x] Platform ekibinin firmalari gorebilecegi merkezi panel ekle.
+
+### 1.3 Randevu API'leri
+
+- [ ] `GET /api/appointments` listeleme endpointi ekle.
+- [ ] `GET /api/appointments/:id` detay endpointi ekle.
+- [ ] `POST /api/appointments` endpointini cakisma kontroluyle guclendir.
+- [ ] `PATCH /api/appointments/:id` randevu guncelleme endpointi ekle.
+- [ ] `POST /api/appointments/:id/cancel` iptal endpointi ekle.
+- [ ] `POST /api/appointments/:id/reschedule` yeniden planlama endpointi ekle.
+- [ ] `POST /api/appointments/confirm` endpointinde kod suresi ve deneme limiti uygula.
+- [ ] Randevu durumu gecislerini merkezi servisle yonet.
+- [ ] Hizmet suresine gore otomatik `endsAt` hesaplamasini koru.
+- [ ] Personel, sube ve hizmet bazli musaitlik sorgusu ekle.
+- [ ] Cakisan randevulari engelle.
+- [x] Randevu tarihi gecmis/hatali ise reddet.
+- [ ] No-show, tamamlandi, gec kaldi gibi durumlari ekle.
+
+### 1.4 Musaitlik ve Takvim Motoru
+
+- [ ] `GET /api/availability` endpointi ekle.
+- [ ] Calisma saatleri, personel izinleri ve mevcut randevulari birlestir.
+- [ ] Hizmet suresine gore uygun slot uret.
+- [ ] Farkli time zone destekle.
+- [ ] Gunluk, haftalik ve aylik slot sorgulari ekle.
+- [ ] Aynanda ayni slota birden fazla musteri yazilmasini transaction ile engelle.
+- [ ] Personel bazli takvim filtreleme ekle.
+- [ ] Sube bazli takvim filtreleme ekle.
+
+### 1.5 Musteri ve CRM API'leri
+
+- [ ] `GET /api/customers` liste endpointi ekle.
+- [ ] `GET /api/customers/:id` detay endpointi ekle.
+- [ ] `PATCH /api/customers/:id` guncelleme endpointi ekle.
+- [ ] Musteri gecmis randevulari ve mesaj gecmisini tek detayda topla.
+- [ ] Musteri notlari ekle.
+- [ ] Musteri etiketleri ekle.
+- [ ] KVKK/GDPR izin tarihlerini kaydet.
+- [ ] WhatsApp/Instagram kimliklerini tek musteri kaydinda birlestirme stratejisi kur.
+
+### 1.6 Firma Yonetim API'leri
+
+- [ ] `GET /api/admin/tenant` firma ayarlari endpointi ekle.
+- [ ] `PATCH /api/admin/tenant` firma guncelleme endpointi ekle.
+- [ ] Hizmet CRUD endpointleri ekle.
+- [ ] Personel CRUD endpointleri ekle.
+- [ ] Sube CRUD endpointleri ekle.
+- [ ] Calisma saatleri CRUD endpointleri ekle.
+- [ ] Kanal entegrasyon ayarlari endpointleri ekle.
+- [ ] Kullanici/rol yonetimi endpointleri ekle.
+
+## 2. WhatsApp ve Instagram Entegrasyonlari
+
+### 2.1 WhatsApp Cloud API
+
+- [ ] Meta Business hesabi ve WhatsApp Business App olustur.
+- [ ] Test phone number ve permanent access token ayarla.
+- [ ] Webhook verify token production env'e ekle.
+- [ ] Gelen mesaj imzasini dogrula.
+- [ ] Gelen mesajlari `Conversation` ve `Message` tablolarina kaydet.
+- [x] Mesajdan randevu niyeti algilama akisi kur.
+- [ ] Musteriye uygun slotlari mesajla sun.
+- [ ] Musteri secimini randevu draft'ina cevir.
+- [ ] Dogrulama kodunu WhatsApp uzerinden gonder.
+- [ ] On odeme gerekiyorsa payment link gonder.
+- [ ] Randevu onay mesaj sablonlarini olustur.
+- [ ] Hatirlatma mesaj sablonlarini olustur.
+- [ ] Iptal ve degisiklik mesaj sablonlarini olustur.
+- [ ] WhatsApp template approval surecini takip et.
+
+### 2.2 Instagram Messaging
+
+- [ ] Meta App uzerinden Instagram messaging izinlerini netlestir.
+- [ ] Instagram webhook verify endpointi ekle.
+- [ ] Gelen DM eventlerini normalize et.
+- [ ] Instagram sender id ile musteri eslestirme kur.
+- [ ] Instagram mesajlarini randevu akisina bagla.
+- [x] Instagram mesajlari icin ilk niyet analizi katmani ekle.
+- [ ] Instagram uzerinden slot secimi ve onay akisi tasarla.
+- [ ] Instagram mesaj cevaplari icin provider servis katmani ekle.
+
+### 2.3 Kanal Soyutlama
+
+- [ ] `sendMessage` fonksiyonunu provider interface'e cevir.
+- [ ] WhatsApp, Instagram, SMS, Email provider adapterlari tanimla.
+- [ ] Mesaj gonderim hatalarini kaydet.
+- [ ] Retry mekanizmasi ekle.
+- [ ] Rate limit ve kota takibi ekle.
+- [ ] Kanal bazli mesaj sablonlari olustur.
+
+### 2.4 n8n ve Lead Import
+
+- [x] n8n inbound endpointi ekle: `POST /api/integrations/n8n/outreach-leads`.
+- [x] `N8N_WEBHOOK_SECRET` ile basit inbound guvenlik katmani ekle.
+- [ ] Google Places bot ciktilarini n8n uzerinden bu endpoint'e bagla.
+- [ ] Google Sheets satirlarini lead havuzuna senkronize edecek n8n workflow tasarla.
+- [ ] Lead tekrarlarini telefon, website ve Google Maps URL ile birlestirme kurali ekle.
+- [ ] Kampanya bazli mesaj sirasi olustur: ilk mesaj, 24 saat follow-up, 72 saat kapanis.
+- [ ] Cevap veren lead'i otomatik `REPLIED`, randevu alan lead'i `BOOKED` durumuna gecir.
+- [ ] WhatsApp template ve Instagram 24 saat kurallarina uygun gonderim penceresi ekle.
+
+## 3. Odeme Sistemi
+
+### 3.1 Stripe / Global Odeme
+
+- [ ] Stripe Checkout production akisini tamamla.
+- [ ] Stripe webhook endpointi ekle.
+- [ ] `checkout.session.completed` eventinde randevuyu onayla.
+- [ ] Odeme basarisizsa randevuyu beklemede tut.
+- [ ] Para birimi ve vergi ayarlarini firma bazli yap.
+- [ ] Refund akisi ekle.
+- [ ] Payment audit log ekle.
+
+### 3.2 Turkiye Odeme Saglayicilari
+
+- [ ] iyzico/PayTR/Param secimi yap.
+- [ ] Secilen saglayici icin adapter yaz.
+- [ ] Firma bazli odeme saglayici ayari ekle.
+- [ ] Taksit/komisyon gereksinimlerini ayri degerlendir.
+
+### 3.3 On Odeme Kurallari
+
+- [ ] Hizmet bazli on odeme tutari zaten var, bunu admin UI'da duzenlenebilir yap.
+- [ ] Yuzde bazli on odeme secenegi ekle.
+- [ ] Iptal suresine gore iade politikasi ekle.
+- [ ] Odeme yapilmayan randevular icin otomatik sure asimi ekle.
+
+## 4. Frontend Yapilacaklar
+
+### 4.1 Dashboard / Takvim
+
+- [ ] Takvim UI'ini componentlere bol: `CalendarToolbar`, `CalendarRail`, `WeekGrid`, `EventCard`.
+- [ ] Gunluk gorunum ekle.
+- [ ] Aylik gorunum ekle.
+- [ ] Personel filtresi ekle.
+- [ ] Sube filtresi ekle.
+- [ ] Kanal filtresi ekle.
+- [ ] Randevu durum filtresi ekle.
+- [ ] Randevu bloklarina detay popover'i ekle.
+- [ ] Drag-and-drop ile randevu tasima icin uygun kutuphane degerlendir.
+- [ ] Randevu tasirken backend reschedule endpointini cagir.
+- [ ] Slot tiklayinca hizli randevu modal'i ac.
+- [ ] Mobilde takvim gorunumunu gunluk listeye dusur.
+
+### 4.2 Randevu Olusturma
+
+- [ ] Public randevu formunu sektor bazli ozellestir.
+- [ ] Hizmet seciminden sonra musait slotlari API'den cek.
+- [ ] Personel secimi opsiyonel olsun.
+- [ ] Sube secimi opsiyonel olsun.
+- [ ] Telefon dogrulama kodu girme adimi ekle.
+- [ ] On odeme gerekiyorsa checkout adimina yonlendir.
+- [ ] Randevu basari ekrani ekle.
+- [ ] Iptal/degisiklik linkleri ekle.
+- [ ] Form validasyonlarini kullanici dostu hale getir.
+
+### 4.3 Mesaj Kutusu
+
+- [ ] Konusma listesini kanal, tarih ve durum filtresiyle yenile.
+- [ ] Konusma detay sayfasi ekle.
+- [ ] Gelen mesaja manuel cevap yazma alani ekle.
+- [ ] Mesajdan randevu olusturma aksiyonu ekle.
+- [ ] Musteri profilini yan panelde goster.
+- [ ] Konusma durumlari ekle: acik, bekliyor, kapandi.
+- [ ] WhatsApp/Instagram mesaj gonderimini UI'dan tetikle.
+
+### 4.3.1 Outreach Merkezi
+
+- [x] Lead havuzu, kampanya listesi, planli iletisim ve entegrasyon sagligi icin ilk dashboard eklendi.
+- [ ] Google Places botundan gelen 50'li listeleri toplu ice aktarma UI'i ekle.
+- [ ] Lead filtreleri ekle: sehir, kategori, puan, yorum sayisi, durum, son iletisim.
+- [ ] Kampanya olusturma ve lead secme ekranlari ekle.
+- [ ] Mesaj sablonu secme ve onizleme ekle.
+- [ ] n8n workflow tetikleme butonu ekle.
+- [ ] Hot lead cevabindan demo randevusu olusturma aksiyonu ekle.
+
+### 4.4 Musteri Paneli
+
+- [ ] Musteri detay sayfasi ekle.
+- [ ] Randevu gecmisi ekle.
+- [ ] Mesaj gecmisi ekle.
+- [ ] Notlar ve etiketler ekle.
+- [ ] Musteri izinleri ve iletisim tercihleri ekle.
+- [ ] Musteri birlestirme araci ekle.
+
+### 4.5 Yonetici Paneli
+
+- [ ] Firma profil formu ekle.
+- [ ] Hizmet ekleme/duzenleme/silme ekranlari ekle.
+- [ ] Personel ekleme/duzenleme/silme ekranlari ekle.
+- [ ] Sube ekleme/duzenleme/silme ekranlari ekle.
+- [ ] Calisma saatleri ekranini ekle.
+- [ ] WhatsApp entegrasyon ayarlari ekle.
+- [ ] Instagram entegrasyon ayarlari ekle.
+- [ ] Odeme entegrasyon ayarlari ekle.
+- [ ] Kullanici ve rol yonetimi ekle.
+- [ ] Abonelik ve fatura ekranlari ekle.
+
+### 4.6 UI / Tasarim Sistemi
+
+- [ ] Renk tokenlarini netlestir.
+- [x] TR/EN dil sozlugu ve locale secim yardimcilari eklendi.
+- [ ] Button, input, select, modal, popover componentlerini standartlastir.
+- [ ] Loading, empty state ve error state tasarimlarini ekle.
+- [ ] Responsive davranislari test et.
+- [ ] Accessibility kontrolleri yap.
+- [ ] Icon kullanimini tutarli hale getir.
+
+## 5. Google Calendar ve Outlook Entegrasyonu
+
+### 5.1 Google Calendar
+
+- [ ] Google Cloud projesi ve OAuth consent screen hazirla.
+- [x] Google OAuth connection modeli ekle.
+- [x] Firma/personel bazli calendar connection kur.
+- [ ] Randevu onaylaninca Google Calendar event olustur.
+- [ ] Randevu guncellenince event guncelle.
+- [ ] Randevu iptal olunca event iptal et.
+- [ ] Google Calendar webhook/push notification yapisini degerlendir.
+- [ ] Harici takvimdeki busy slotlari availability motoruna dahil et.
+
+### 5.2 Outlook / Microsoft Graph
+
+- [ ] Azure App registration hazirla.
+- [x] OAuth connection modeli Google ile ortak kullanilsin.
+- [ ] Microsoft Graph event create/update/delete servisleri ekle.
+- [ ] Outlook busy slotlarini availability motoruna dahil et.
+
+## 6. Bildirimler ve Otomasyon
+
+- [ ] Randevu olustugunda firma kullanicisina bildirim gonder.
+- [ ] Musteriye randevu onay bildirimi gonder.
+- [ ] Randevudan 24 saat once hatirlatma gonder.
+- [ ] Randevudan 2 saat once hatirlatma gonder.
+- [ ] On odeme bekleyen randevular icin hatirlatma gonder.
+- [ ] Iptal edilen randevular icin ilgili taraflara mesaj gonder.
+- [ ] Background job sistemi sec: BullMQ/Redis veya hosted queue.
+- [ ] Job retry ve dead-letter mekanizmasi ekle.
+
+## 7. Altyapi ve Coolify
+
+### 7.1 Production Hazirlik
+
+- [ ] PostgreSQL servisini Coolify icinde hazirla.
+- [ ] Redis gerekecekse Coolify icinde ayri servis olarak ekle.
+- [ ] `.env` production degerlerini Coolify environment variables'a gir.
+- [x] `DATABASE_URL` PostgreSQL olarak ayarla.
+- [ ] `NEXTAUTH_SECRET` guclu secret ile degistir.
+- [ ] `NEXTAUTH_URL` production domain'e gore ayarla.
+- [ ] `NEXT_PUBLIC_APP_URL` production domain'e gore ayarla.
+- [x] Build command: `npm run build`.
+- [x] Start command: `npm run start`.
+- [x] Migration stratejisi belirle.
+
+### 7.2 Deployment
+
+- [ ] Git repository olustur.
+- [ ] Projeyi Git'e commit et.
+- [ ] Coolify'da repo baglantisini yap.
+- [ ] Build ve start komutlarini gir.
+- [ ] Domain bagla.
+- [ ] SSL aktiflestir.
+- [ ] Health check endpointi ekle.
+- [ ] Loglari Coolify uzerinden takip et.
+
+### 7.3 Monitoring
+
+- [ ] Sentry veya benzeri hata takibi ekle.
+- [ ] Request logging ekle.
+- [ ] API hata formatini standartlastir.
+- [ ] Slow query/log takibi ekle.
+- [ ] Backup stratejisi belirle.
+- [ ] PostgreSQL otomatik backup ayarla.
+
+## 8. Guvenlik ve Uyumluluk
+
+- [ ] Tum endpointlere input validation uygula.
+- [x] Randevu olusturmada tarih ve cakisma dogrulama katmani eklendi.
+- [ ] API hata mesajlarinda hassas veri dondurme.
+- [ ] Webhook imza dogrulamalarini aktiflestir.
+- [ ] Rate limit ekle.
+- [ ] Tenant data isolation testleri yaz.
+- [ ] Audit log ekle.
+- [ ] KVKK/GDPR metinleri icin hukuki taslak hazirla.
+- [ ] Musteri acik riza kaydi tut.
+- [ ] Cagri kaydi/sesli asistan ileride eklenecekse izin metni hazirla.
+- [ ] Saglik verisi tutulacaksa ayri veri politikasi hazirla.
+
+## 9. Test Plani
+
+- [ ] Appointment service unit testleri yaz.
+- [ ] Availability engine unit testleri yaz.
+- [ ] Payment webhook testleri yaz.
+- [ ] WhatsApp webhook payload testleri yaz.
+- [ ] Instagram webhook payload testleri yaz.
+- [ ] Tenant izolasyonu testleri yaz.
+- [ ] Dashboard render testleri ekle.
+- [ ] Public booking form e2e testi ekle.
+- [ ] Randevu onay akisi e2e testi ekle.
+- [ ] Production build CI kontrolu ekle.
+
+## 10. MVP Sirasina Gore Uygulama Plani
+
+### Sprint 1: Temel SaaS Omurgasi
+
+- [x] PostgreSQL gecisi.
+- [ ] Auth ve tenant izolasyonu.
+- [ ] Firma, hizmet, personel, sube CRUD.
+- [ ] Randevu listeleme/detay/guncelleme/iptal API'leri.
+- [ ] Dashboard takvim component ayrimi.
+
+### Sprint 2: Musaitlik ve Randevu Akisi
+
+- [ ] Availability API.
+- [ ] Public booking formunda slot secimi.
+- [ ] Iki adimli telefon/WhatsApp dogrulama UI.
+- [ ] Randevu cakisma kontrolu.
+- [ ] On odeme gerekiyorsa payment checkout.
+
+### Sprint 3: WhatsApp Merkezli Operasyon
+
+- [ ] WhatsApp webhook imza dogrulama.
+- [ ] Gelen mesajdan conversation kaydi.
+- [ ] Manuel cevap UI.
+- [ ] Mesajdan randevu olusturma.
+- [ ] Onay ve hatirlatma sablonlari.
+
+### Sprint 4: Instagram ve Odeme
+
+- [ ] Instagram webhook dogrulama.
+- [ ] Instagram DM conversation akisi.
+- [ ] Stripe webhook.
+- [ ] Payment status ile appointment status senkronizasyonu.
+- [ ] On odeme iptal/sure asimi.
+
+### Sprint 5: Calendar Sync ve Production
+
+- [ ] Google Calendar OAuth.
+- [ ] Event create/update/delete.
+- [ ] External busy slot import.
+- [ ] Coolify deployment.
+- [ ] Monitoring ve backup.
+
+## 11. Karar Bekleyen Konular
+
+- [ ] Ilk hedef sektor: saglik mi, emlak mi, turizm mi?
+- [ ] Ilk odeme saglayici: Stripe mi, iyzico/PayTR mi?
+- [ ] Auth cozumunde NextAuth mi, Clerk/Auth0 gibi managed servis mi?
+- [ ] Ilk mesajlasma kanali sadece WhatsApp mi, Instagram ayni sprintte mi?
+- [ ] Mobil uygulama ilk fazda gerekli mi, yoksa responsive web yeterli mi?
+- [ ] Sesli operator modulu hangi musteri sayisindan sonra baslayacak?
+
+## 12. Sonraki En Mantikli Adim
+
+Ilk teknik adim olarak su sirayi takip edelim:
+
+1. Auth + tenant isolation.
+2. Hizmet/personel/sube yonetim ekranlari.
+3. Musaitlik API'si.
+4. Public booking formunu gercek slot secimine baglama.
+5. WhatsApp webhook akisini randevu motoruna baglama.

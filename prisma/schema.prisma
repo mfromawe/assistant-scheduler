@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  SUPPORT
+  FINANCE
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum TenantIsolationMode {
+  SHARED_DATABASE
+  DEDICATED_SCHEMA
+  DEDICATED_DATABASE
+}
+
+enum CalendarProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+enum CalendarConnectionStatus {
+  CONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum AppointmentStatus {
+  DRAFT
+  PENDING_VERIFICATION
+  PAYMENT_PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum Channel {
+  WEB
+  WHATSAPP
+  INSTAGRAM
+  PHONE
+}
+
+enum ChannelProvider {
+  WHATSAPP_CLOUD
+  INSTAGRAM_GRAPH
+  N8N
+  GOOGLE_SHEETS
+  GOOGLE_DRIVE
+}
+
+enum IntegrationStatus {
+  DRAFT
+  CONNECTED
+  NEEDS_ATTENTION
+  DISABLED
+}
+
+enum OutreachLeadStatus {
+  NEW
+  QUALIFIED
+  CONTACTED
+  REPLIED
+  BOOKED
+  NOT_INTERESTED
+  INVALID
+}
+
+enum OutreachCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Tenant {
+  id                    String               @id @default(cuid())
+  name                  String
+  slug                  String               @unique
+  sector                String
+  timezone              String               @default("Europe/Istanbul")
+  locale                String               @default("tr")
+  status                TenantStatus         @default(TRIAL)
+  plan                  String               @default("starter")
+  isolationMode         TenantIsolationMode  @default(SHARED_DATABASE)
+  databaseUrlSecretName String?
+  supportAccessEnabled  Boolean              @default(true)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  users                 User[]
+  locations             Location[]
+  services              Service[]
+  customers             Customer[]
+  staff                 StaffMember[]
+  appointments          Appointment[]
+  conversations         Conversation[]
+  calendarConnections   CalendarConnection[]
+  channelIntegrations   ChannelIntegration[]
+  outreachLeads         OutreachLead[]
+  outreachCampaigns     OutreachCampaign[]
+  outreachActivities    OutreachActivity[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(STAFF)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model PlatformUser {
+  id        String       @id @default(cuid())
+  name      String
+  email     String       @unique
+  password  String
+  role      PlatformRole @default(SUPPORT)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+}
+
+model Location {
+  id           String        @id @default(cuid())
+  tenantId     String
+  name         String
+  address      String?
+  phone        String?
+  createdAt    DateTime      @default(now())
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([tenantId])
+}
+
+model Service {
+  id              String        @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  durationMinutes Int
+  depositAmount   Int           @default(0)
+  currency        String        @default("TRY")
+  isActive        Boolean       @default(true)
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+
+  @@index([tenantId])
+}
+
+model StaffMember {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  name                String
+  title               String?
+  email               String?
+  phone               String?
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  calendarConnections CalendarConnection[]
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id            String         @id @default(cuid())
+  tenantId      String
+  name          String
+  phone         String
+  email         String?
+  instagramId   String?
+  whatsappId    String?
+  createdAt     DateTime       @default(now())
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  conversations Conversation[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+}
+
+model Appointment {
+  id               String                 @id @default(cuid())
+  tenantId         String
+  customerId       String
+  serviceId        String
+  staffMemberId    String?
+  locationId       String?
+  channel          Channel
+  status           AppointmentStatus      @default(DRAFT)
+  paymentStatus    PaymentStatus          @default(NOT_REQUIRED)
+  startsAt         DateTime
+  endsAt           DateTime
+  verificationCode String?
+  notes            String?
+  depositAmount    Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer         Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service          Service                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  staffMember      StaffMember?           @relation(fields: [staffMemberId], references: [id])
+  location         Location?              @relation(fields: [locationId], references: [id])
+  payment          Payment?
+  calendarEvents   CalendarEventMapping[]
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, status])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  appointmentId String        @unique
+  provider      String
+  providerRef   String?
+  amount        Int
+  currency      String        @default("TRY")
+  status        PaymentStatus @default(PENDING)
+  checkoutUrl   String?
+  createdAt     DateTime      @default(now())
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+}
+
+model CalendarConnection {
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  staffMemberId      String?
+  provider           CalendarProvider
+  status             CalendarConnectionStatus @default(CONNECTED)
+  accountEmail       String?
+  calendarId         String?
+  accessTokenCipher  String?
+  refreshTokenCipher String?
+  tokenExpiresAt     DateTime?
+  syncEnabled        Boolean                  @default(true)
+  lastSyncedAt       DateTime?
+  syncError          String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffMember        StaffMember?             @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  calendarEvents     CalendarEventMapping[]
+
+  @@index([tenantId, provider])
+  @@index([tenantId, staffMemberId])
+}
+
+model CalendarEventMapping {
+  id                   String             @id @default(cuid())
+  tenantId             String
+  appointmentId        String
+  calendarConnectionId String
+  provider             CalendarProvider
+  externalEventId      String
+  externalCalendarId   String?
+  lastSyncedAt         DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  appointment          Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  calendarConnection   CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarConnectionId, externalEventId])
+  @@index([tenantId, appointmentId])
+}
+
+model ChannelIntegration {
+  id                    String            @id @default(cuid())
+  tenantId              String
+  provider              ChannelProvider
+  displayName           String
+  status                IntegrationStatus @default(DRAFT)
+  externalAccountId     String?
+  webhookUrl            String?
+  accessTokenSecretName String?
+  settings              Json?
+  lastHealthCheckAt     DateTime?
+  lastError             String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  tenant                Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, provider])
+  @@index([tenantId, status])
+}
+
+model OutreachLead {
+  id             String              @id @default(cuid())
+  tenantId       String
+  source         String              @default("google_places")
+  externalRef    String?
+  name           String
+  phone          String?
+  email          String?
+  website        String?
+  googleMapsUrl  String?
+  address        String?
+  city           String?
+  category       String?
+  rating         Float?
+  reviewCount    Int?
+  status         OutreachLeadStatus  @default(NEW)
+  ownerNote      String?
+  consentStatus  String              @default("unknown")
+  lastContactedAt DateTime?
+  nextFollowUpAt DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns      OutreachCampaignLead[]
+  activities     OutreachActivity[]
+
+  @@unique([tenantId, source, externalRef])
+  @@index([tenantId, status])
+  @@index([tenantId, city])
+}
+
+model OutreachCampaign {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  name           String
+  status         OutreachCampaignStatus @default(DRAFT)
+  objective      String?
+  defaultChannel Channel                @default(WHATSAPP)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads          OutreachCampaignLead[]
+  activities     OutreachActivity[]
+
+  @@index([tenantId, status])
+}
+
+model OutreachCampaignLead {
+  campaignId String
+  leadId     String
+  addedAt    DateTime         @default(now())
+  campaign   OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead       OutreachLead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, leadId])
+  @@index([leadId])
+}
+
+model OutreachActivity {
+  id          String             @id @default(cuid())
+  tenantId    String
+  campaignId  String?
+  leadId      String?
+  channel     Channel
+  direction   String             @default("outbound")
+  status      String             @default("scheduled")
+  body        String
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  error       String?
+  createdAt   DateTime           @default(now())
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign    OutreachCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  lead        OutreachLead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, scheduledAt])
+  @@index([leadId])
+}
+
+model Conversation {
+  id         String    @id @default(cuid())
+  tenantId   String
+  customerId String?
+  channel    Channel
+  externalId String?
+  status     String    @default("open")
+  createdAt  DateTime  @default(now())
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  messages   Message[]
+
+  @@index([tenantId, createdAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  direction      String
+  body           String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}

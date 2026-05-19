@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: assistant-scheduler-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: assistant_scheduler
+      POSTGRES_PASSWORD: assistant_scheduler
+      POSTGRES_DB: assistant_scheduler
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assistant_scheduler -d assistant_scheduler"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
